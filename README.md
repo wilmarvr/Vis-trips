@@ -1,32 +1,23 @@
 # Vis Trips
 
-Een kleine full-stack demo die een statische HTML/CSS-frontend combineert met een Express backend en een MySQL database. Via het formulier kun je trips opslaan en direct bekijken.
+Een compacte webapp waarmee je trips kunt opslaan en bekijken in een MySQL database. De frontend is plain HTML/CSS/JS en de backend is een enkel PHP-script, dus je kunt het zo op shared hosting of een lokale XAMPP-stack zetten.
 
 ## Vereisten
-- Node.js 18+
-- MySQL 8+
+- PHP 8+
+- MySQL 5.7+ (of compatibel)
+- Een webserver (Apache/Nginx) of XAMPP/WAMP/LAMP
 
-## Installatie
-1. Installeer dependencies:
-   ```bash
-   npm install
-   ```
-2. Maak een `.env` bestand op basis van `.env.example` en vul je MySQL gegevens in:
-   ```bash
-   cp .env.example .env
-   ```
-3. Start de server:
-   ```bash
-   npm start
-   ```
-4. Open de app op [http://localhost:3000](http://localhost:3000).
-
-> De backend maakt automatisch de tabel `trips` aan als deze nog niet bestaat.
+## Installatie (hosting of XAMPP)
+1. Maak een database aan (bijv. `vis_trips`).
+2. Kopieer de map `public/` naar de webroot van je hosting of naar de `htdocs` van XAMPP.
+3. Configureer databasegegevens:
+   - Standaard leest `public/api.php` omgevingsvariabelen `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+   - Kun je geen variabelen zetten? Kopieer `public/config.sample.php` naar `public/config.php` en vul daar je gegevens in.
+4. Bezoek de site (bijv. `http://localhost/vis-trips`) en sla je eerste trip op. De tabel wordt automatisch aangemaakt.
 
 ## API
-- `GET /api/health` — controleert of de databaseverbinding werkt.
-- `GET /api/trips` — haalt alle opgeslagen trips op.
-- `POST /api/trips` — slaat een nieuwe trip op. Vereist JSON body:
+- `GET public/api.php` — haalt alle opgeslagen trips op.
+- `POST public/api.php` — slaat een nieuwe trip op. Vereist JSON body:
   ```json
   {
     "travelerName": "Noor",
@@ -38,14 +29,15 @@ Een kleine full-stack demo die een statische HTML/CSS-frontend combineert met ee
 
 ## Structuur
 ```
-public/        # Statische frontend
-server.js      # Express server + MySQL logica
-.env.example   # Configuratievoorbeeld
+public/                # Frontend + PHP API
+  ├─ api.php           # Backend eindpunt
+  └─ config.sample.php # Optioneel: kopieer naar config.php voor DB-gegevens
+.env.example           # Voorbeeld van DB variabelen (voor hosting die env vars ondersteunt)
 ```
 
 ## MySQL handmatig voorbereiden (optioneel)
-De server maakt de tabel aan, maar je kunt het ook zelf doen:
-```sql
+De PHP backend maakt de tabel aan, maar je kunt het ook zelf doen:
+```
 CREATE DATABASE vis_trips;
 USE vis_trips;
 CREATE TABLE trips (

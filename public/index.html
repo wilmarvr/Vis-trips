@@ -156,7 +156,7 @@
         <h1>Vis Trips</h1>
         <p>
           Plan je volgende reis en sla de details direct op in een MySQL database. Vul het
-          formulier in en bekijk hieronder meteen de opgeslagen trips via de Express backend.
+          formulier in en bekijk hieronder meteen de opgeslagen trips via de eenvoudige PHP backend.
         </p>
       </header>
 
@@ -199,7 +199,7 @@
       async function fetchTrips() {
         tripsEl.innerHTML = '<p class="empty">Gegevens laden...</p>';
         try {
-          const response = await fetch('/api/trips');
+          const response = await fetch('api.php');
           const data = await response.json();
 
           if (!data.length) {
@@ -236,7 +236,7 @@
         };
 
         try {
-          const response = await fetch('/api/trips', {
+          const response = await fetch('api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
