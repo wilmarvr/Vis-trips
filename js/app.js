@@ -77,7 +77,40 @@ var DB_KEY="lv_db_main";
 var db={waters:[],steks:[],rigs:[],bathy:{points:[],datasets:[]},settings:{waterColor:"#33a1ff"}};
 try{var raw=localStorage.getItem(DB_KEY); if(raw) db=JSON.parse(raw);}catch(e){}
 normalizeDB();
-function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){}}
+var syncEnabled=true, syncTimer=null;
+var syncToggle=document.getElementById('serverSync');
+if(syncToggle){
+  syncEnabled=syncToggle.checked;
+  syncToggle.addEventListener('change',function(){ syncEnabled=this.checked; if(syncEnabled) scheduleSync(); });
+}
+var syncBtn=document.getElementById('btnSyncNow');
+if(syncBtn){ syncBtn.addEventListener('click',function(){ syncToServer(true); }); }
+function saveDB(){
+  try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){}
+  scheduleSync();
+}
+function scheduleSync(){
+  if(!syncEnabled) return;
+  if(syncTimer) clearTimeout(syncTimer);
+  syncTimer=setTimeout(function(){syncToServer(false);},600);
+}
+async function syncToServer(force){
+  if(!syncEnabled && !force) return;
+  if(syncTimer){ clearTimeout(syncTimer); syncTimer=null; }
+  S('Wegschrijven naar MySQL...');
+  try{
+    var res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(db)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var body=await res.json();
+    var s=body && body.summary ? body.summary : {};
+    var parts=[];
+    ['waters','steks','rigs','bathyPoints','bathyDatasets'].forEach(function(k){ if(s[k]!=null) parts.push(k+': '+s[k]); });
+    S('MySQL opgeslagen'+(parts.length? ' ('+parts.join(', ')+')' : '.'));
+  }catch(err){
+    console.error('Sync fout',err);
+    S('MySQL fout: '+(err && err.message? err.message:err));
+  }
+}
 function normalizeDB(){
   function num(v){ return (typeof v==='string'? parseFloat(v) : v); }
   db.steks=(db.steks||[]).map(function(s){return {id:s.id||uid('stek'),name:s.name||"",note:s.note||"",lat:num(s.lat),lng:num(s.lng),waterId:s.waterId||null};});
