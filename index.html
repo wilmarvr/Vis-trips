@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vis Lokaties v1.1.3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="toolbar">
+  <h3>🎣 Vis Lokaties v1.1.3</h3>
+
+  <div style="margin:4px 0 8px">
+    Basemap:
+    <select id="basemap">
+      <option value="osm">OSM</option>
+      <option value="toner">Toner</option>
+      <option value="terrain">Terrain</option>
+      <option value="dark">Carto Dark</option>
+    </select>
+  </div>
+
+  <details open>
+    <summary>📍 Spots</summary>
+    <button id="btn-add-stek">➕ Nieuwe stek</button>
+    <button id="btn-add-rig">🎯 Nieuwe rig</button>
+    <label><input type="checkbox" id="useCluster"> Clustering</label><br>
+    <label><input type="checkbox" id="showDistances" checked> Afstanden tonen</label><br>
+    <button id="btnForceDragFix">⚙️ Drag-fix</button>
+  </details>
+
+  <details>
+    <summary>🔎 Detectie</summary>
+    <div>
+      <label>Max edge (m): <input type="number" id="detMaxEdge" value="250" style="width:70px"></label><br>
+      <button id="btnDetectViewport">Detecteer uit beeld</button>
+      <button id="btnDetectFromPoints">Detecteer uit selectie</button><br>
+      <button id="btnDetectOSM">Detecteer OSM water</button><br>
+      <input type="text" id="detName" placeholder="Naam nieuw water"><br>
+      <button id="btnSaveAsWater">💾 Opslaan als water</button><br>
+      <button id="btnSelClear">🧹 Selectie wissen</button>
+    </div>
+  </details>
+
+  <details>
+    <summary>🌊 Deeper import & Heatmap</summary>
+    <div>
+      <button id="btn-import-files">📁 Importeer CSV/ZIP</button>
+      <button id="btn-import-dir">📂 Hele map</button><br>
+      <input id="fileDeeper" type="file" accept=".csv,.zip" multiple style="display:none">
+      <input id="dirDeeper" type="file" webkitdirectory directory multiple style="display:none">
+      <label><input type="checkbox" id="saveBathy" checked> Opslaan in DB</label><br>
+      <div class="progress"><div id="impBarAll" class="bar"></div></div>
+      <span id="impCount">0/0</span> | <span id="impPctAll">0%</span>
+      <pre id="queue" style="font-size:11px;max-height:80px;overflow:auto;"></pre>
+      <hr>
+      <div>Radius:<input type="range" id="hmRadius" min="1" max="50" value="25"><span id="hmR">25</span></div>
+      <div>Blur:<input type="range" id="hmBlur" min="1" max="40" value="15"><span id="hmB">15</span></div>
+      <label>Min m:<input type="number" id="hmMin" step="0.1" style="width:60px"></label>
+      <label>Max m:<input type="number" id="hmMax" step="0.1" style="width:60px"></label><br>
+      <label><input type="checkbox" id="hmInvert"> Kleuren omkeren</label>
+      <label><input type="checkbox" id="hmClip"> Alleen in beeld</label><br>
+      <label><input type="checkbox" id="hmFixed"> Vast 0-20 m bereik</label><br>
+      <div id="legend" class="legend"></div>
+      <div id="hmStats">Min: – • Max: –</div>
+      <hr>
+      <button id="btn-clear-heat">🔥 Wis heatmap</button>
+      <button id="btn-clear-bathy">💧 Wis DB bathy</button>
+      <div>Totaal punten: <span id="bathyTotal">0</span> | Heatmap: <span id="heatCount">0</span></div>
+    </div>
+  </details>
+
+  <details>
+    <summary>📊 Overzicht & beheren</summary>
+    <div>
+      <div class="tabs">
+        <button class="tab active" data-tab="waters">Waters</button>
+        <button class="tab" data-tab="steks">Stekken</button>
+        <button class="tab" data-tab="rigs">Rigspots</button>
+      </div>
+      <div id="tab-waters"></div>
+      <div id="tab-steks" style="display:none"></div>
+      <div id="tab-rigs" style="display:none"></div>
+    </div>
+  </details>
+
+  <details id="contourPanel">
+    <summary>🗺️ Contouren</summary>
+    <div>
+      <button id="btn-gen-contours">Maak contouren</button>
+      <button id="btn-clear-contours">Wis contouren</button>
+      <div class="muted" style="margin-top:4px">Gebruikt DB-bathymetrie binnen kaartbeeld</div>
+    </div>
+  </details>
+
+  <details>
+    <summary>🧨 Opschonen & export</summary>
+    <div>
+      <button id="btnExport">💾 Export alles</button>
+      <button id="btn-import-files2">📥 Import GeoJSON</button>
+      <input id="fileMerge" type="file" accept=".json,.geojson" style="display:none"><br>
+      <button id="btnLocalSave">💾 Opslaan in browser</button>
+      <button id="btnLocalLoad">📤 Laden uit browser</button>
+      <button id="btnLocalReset" class="btn danger">Reset browser data</button><br>
+      <button id="btnSaveHtml">📄 Download HTML</button>
+    </div>
+  </details>
+
+  <details>
+    <summary>🛰️ GPS & navigatie</summary>
+    <div>
+      <button id="btnGps">📡 Start/Stop GPS</button>
+      <label>Status: <span id="gpsStatus">uit</span></label>
+    </div>
+  </details>
+</div>
+
+<div id="mapContainer"></div>
+<div id="footer">
+  <div id="statusLine">Klaar.</div>
+  <div id="footerDetect">—</div>
+  <div id="mouseLL">—</div>
+  <div id="zoomLbl">—</div>
+</div>
+
+<div id="gpsPanel">
+  📍 GPS: Lat <span id="gpsLat">–</span> Lon <span id="gpsLon">–</span><br>
+  🎯 Nauwkeurigheid: <span id="gpsAcc">–</span> m | Snelheid: <span id="gpsSpd">–</span> m/s | Koers: <span id="gpsBrg">–</span>°
+</div>
+
+<!-- Deduplicate-fix om dubbele toolbars te verwijderen (laat eerste exemplaar staan) -->
+
+<!-- Leaflet & plugins (JS — volgorde is belangrijk) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Heat plugin MOET na Leaflet -->
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<!-- Extra libs -->
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+<!-- touchleave → pointerleave polyfill -->
+
+
+
+<!-- OSM→GeoJSON (eilanden behouden) -->
+
+
+  <script src="js/app.js"></script>
+</body>
+</html>
