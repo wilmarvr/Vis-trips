@@ -1,0 +1,2 @@
+Manual verification:
+- Playwright (browser_container) script added a stek, enabled clustering, dragged the marker, and observed status "stek verplaatst & gekoppeld." with updated coordinates (52.40277889087572, 5.2401888370513925).
