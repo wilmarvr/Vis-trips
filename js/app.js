@@ -629,10 +629,10 @@ function parseCSV(text, seen){
   for(var t=0;t<rawPts.length;t++){
     var p=rawPts[t];
     if(clip && !(p.lat>=b.getSouth()&&p.lat<=b.getNorth()&&p.lon>=b.getWest()&&p.lon<=b.getEast())) continue;
-    var w=scaleDepth(p.dep, isNaN(minV)?null:minV, isNaN(maxV)?null|maxV, inv);
+    var w=scaleDepth(p.dep, isNaN(minV) ? null : minV, isNaN(maxV) ? null : maxV, inv);
     out.push([p.lat,p.lon,w]);
   }
-  updateLegend(isNaN(minV)?null:minV, isNaN(maxV)?null|maxV, inv);
+  updateLegend(isNaN(minV) ? null : minV, isNaN(maxV) ? null : maxV, inv);
   return {points:out, raw:rawPts};
 }
 
