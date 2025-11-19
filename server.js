@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const express = require('express');
 const mysql = require('mysql2/promise');
 
@@ -9,26 +10,63 @@ app.use(express.json({limit:'20mb'}));
 function loadConfig(){
   const cfgPath = path.join(__dirname, 'mysql', 'config.json');
   if(fs.existsSync(cfgPath)){
-    return JSON.parse(fs.readFileSync(cfgPath,'utf8'));
+    const fileCfg = JSON.parse(fs.readFileSync(cfgPath,'utf8'));
+    return {...fileCfg, host: fileCfg.host || 'localhost', database: fileCfg.database || 'vis_trips'};
   }
   const envCfg = {
-    host: process.env.MYSQL_HOST,
+    host: process.env.MYSQL_HOST || 'localhost',
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE || 'vis_trips'
   };
-  const hasEnv = Object.values(envCfg).some(Boolean);
+  const hasEnv = ['MYSQL_HOST','MYSQL_USER','MYSQL_PASSWORD','MYSQL_DATABASE'].some(key => process.env[key]);
   if(hasEnv) return envCfg;
   throw new Error('MySQL config ontbreekt. Maak mysql/config.json of stel MYSQL_* variabelen in.');
 }
 
-const config = loadConfig();
-const pool = mysql.createPool({
-  ...config,
-  waitForConnections:true,
-  connectionLimit:5,
-  namedPlaceholders:true
-});
+let pool;
+
+async function promptForDbUser(defaultUser){
+  const rl = readline.createInterface({input:process.stdin, output:process.stdout});
+  const ask = (question) => new Promise(resolve => rl.question(question, answer => resolve(answer)));
+  const user = (await ask(`Welke databasegebruiker moet worden aangemaakt of gebruikt? (${defaultUser}): `)) || defaultUser;
+  const password = await ask('Welk wachtwoord moet die gebruiker krijgen? ');
+  rl.close();
+  return {user, password};
+}
+
+async function ensureDatabaseAndTables(config){
+  const adminConfig = {...config};
+  delete adminConfig.database;
+
+  const schemaPath = path.join(__dirname, 'mysql', 'schema.sql');
+  const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+
+  const connection = await mysql.createConnection({...adminConfig, multipleStatements:true});
+
+  const [[dbExists]] = await connection.query('SELECT SCHEMA_NAME as name FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?', [config.database]);
+  let finalUser = config.user;
+  let finalPassword = config.password;
+
+  if(!dbExists){
+    console.log(`Database ${config.database} bestaat niet. We maken hem aan.`);
+    const creds = await promptForDbUser(config.user || 'vistrips');
+    finalUser = creds.user;
+    finalPassword = creds.password;
+
+    const dbName = mysql.escapeId(config.database);
+    await connection.query(`CREATE DATABASE ${dbName} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    const userIdent = mysql.escape(creds.user);
+    await connection.query(`CREATE USER IF NOT EXISTS ${userIdent}@'%' IDENTIFIED BY ${mysql.escape(creds.password)}`);
+    await connection.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userIdent}@'%'`);
+    await connection.query('FLUSH PRIVILEGES');
+  }
+
+  await connection.query(schemaSql);
+  await connection.end();
+
+  return {...config, user:finalUser, password:finalPassword};
+}
 
 async function saveAll(payload){
   const {waters=[],steks=[],rigs=[],bathy={points:[],datasets:[]}} = payload || {};
@@ -87,7 +125,23 @@ app.post('/api/save', async (req,res)=>{
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, ()=>{
-  console.log(`Vis-trips API luistert op :${port}`);
+async function start(){
+  const config = loadConfig();
+  const ensuredConfig = await ensureDatabaseAndTables(config);
+  pool = mysql.createPool({
+    ...ensuredConfig,
+    waitForConnections:true,
+    connectionLimit:5,
+    namedPlaceholders:true
+  });
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, ()=>{
+    console.log(`Vis-trips API luistert op :${port}`);
+  });
+}
+
+start().catch(err => {
+  console.error('Kon de database niet initialiseren of de server niet starten:', err);
+  process.exit(1);
 });
