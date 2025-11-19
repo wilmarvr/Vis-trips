@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vis Trips</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>Vis Trips</h1>
+        <p>
+          Plan je volgende reis en sla de details direct op in een MySQL database. Vul het
+          formulier in en bekijk hieronder meteen de opgeslagen trips via de eenvoudige PHP backend.
+        </p>
+      </header>
+
+      <main>
+        <section>
+          <form id="tripForm">
+            <div>
+              <label for="travelerName">Naam reiziger</label>
+              <input id="travelerName" name="travelerName" placeholder="Bijv. Noor Janssen" required />
+            </div>
+            <div>
+              <label for="destination">Bestemming</label>
+              <input id="destination" name="destination" placeholder="Bijv. Oslo" required />
+            </div>
+            <div>
+              <label for="tripDate">Datum</label>
+              <input id="tripDate" name="tripDate" type="date" required />
+            </div>
+            <div>
+              <label for="notes">Notities</label>
+              <textarea id="notes" name="notes" rows="4" placeholder="Wat wil je echt niet vergeten?"></textarea>
+            </div>
+            <button type="submit">Opslaan</button>
+            <p class="status" id="status"></p>
+          </form>
+        </section>
+
+        <section>
+          <h2>Opgeslagen trips</h2>
+          <div id="trips" class="trips"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
