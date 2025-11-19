@@ -105,8 +105,25 @@ function purgeAllMarkers(){
   try{if(cluster&&map.hasLayer(cluster)){cluster.clearLayers(); map.removeLayer(cluster);}}catch(_){} 
 }
 function attachMarker(m,type,id){
+  function pullFromCluster(){
+    if(!useCluster) return;
+    try{ if(cluster && cluster.hasLayer(m)){ cluster.removeLayer(m); m.addTo(map); } }
+    catch(_){ }
+    if(m.dragging) m.dragging.enable();
+  }
+
   if(m.dragging) m.dragging.enable();
-  m.on('dragstart',function(){try{map.dragging.disable();}catch(_){ } if(useCluster){try{cluster.removeLayer(m);}catch(_){ } m.addTo(map);}});
+  m.on('add',function(){ if(m.dragging) m.dragging.enable(); });
+  ['mousedown','touchstart','pointerdown'].forEach(function(evt){
+    m.on(evt,function(ev){
+      pullFromCluster();
+      if(ev && ev.originalEvent && ev.originalEvent.stopPropagation){ ev.originalEvent.stopPropagation(); }
+      if(m.dragging && m.dragging._draggable && typeof m.dragging._draggable._onDown==='function'){
+        m.dragging._draggable._onDown(ev.originalEvent||ev);
+      }
+    });
+  });
+  m.on('dragstart',function(){pullFromCluster(); try{map.dragging.disable();}catch(_){ }});
   m.on('drag',function(){ drawDistances(); });
   m.on('dragend',function(ev){
     try{map.dragging.enable();}catch(_){ }
@@ -211,7 +228,17 @@ function nameOfWater(id){ var w=db.waters.find(function(x){return x.id===id;}); 
 // ===== render / overview =====
 function renderAll(){
   purgeAllMarkers();
-  if(useCluster){ cluster=L.markerClusterGroup({disableClusteringAtZoom:19}); map.addLayer(cluster); }
+  if(useCluster){
+    cluster=L.markerClusterGroup({disableClusteringAtZoom:19});
+    cluster.on('layeradd',function(ev){
+      var layer=ev.layer;
+      if(layer && layer.dragging){ layer.dragging.enable(); }
+      if(layer && typeof layer.on==='function'){
+        ['mousedown','touchstart','pointerdown'].forEach(function(evt){ layer.on(evt,function(){ try{cluster.removeLayer(layer); layer.addTo(map);}catch(_){ } if(layer.dragging) layer.dragging.enable(); }); });
+      }
+    });
+    map.addLayer(cluster);
+  }
   waterGroup.clearLayers(); isobandLayer.clearLayers(); contourLayer.clearLayers(); measureLayer.clearLayers();
 
   db.waters.forEach(function(w){
