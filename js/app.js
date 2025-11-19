@@ -85,6 +85,76 @@ if(syncToggle){
 }
 var syncBtn=document.getElementById('btnSyncNow');
 if(syncBtn){ syncBtn.addEventListener('click',function(){ syncToServer(true); }); }
+
+var dbReady=false;
+var dbModal=document.getElementById('dbModal');
+var dbForm=document.getElementById('dbForm');
+var dbError=document.getElementById('dbError');
+var dbHost=document.getElementById('dbHost');
+var dbName=document.getElementById('dbName');
+var dbUser=document.getElementById('dbUser');
+var dbPass=document.getElementById('dbPass');
+var dbCancel=document.getElementById('dbCancel');
+
+function openDbModal(defaults){
+  if(dbHost) dbHost.value = defaults && defaults.host ? defaults.host : 'localhost';
+  if(dbName) dbName.value = defaults && defaults.database ? defaults.database : 'vis_trips';
+  if(dbUser) dbUser.value = defaults && defaults.user ? defaults.user : '';
+  if(dbPass) dbPass.value = '';
+  if(dbError) dbError.textContent='';
+  if(dbModal){ dbModal.classList.add('open'); dbModal.setAttribute('aria-hidden','false'); }
+}
+
+function closeDbModal(){
+  if(dbModal){ dbModal.classList.remove('open'); dbModal.setAttribute('aria-hidden','true'); }
+}
+
+async function checkDbStatus(){
+  try{
+    var res = await fetch('/api/db/status');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var body = await res.json();
+    if(body && body.ok){ dbReady=true; return true; }
+    if(body && body.needsCredentials){
+      openDbModal(body.defaults||{});
+      dbReady=false;
+      return false;
+    }
+    throw new Error(body && body.error ? body.error : 'Database status onbekend');
+  }catch(err){
+    console.warn('DB status fout', err);
+    S('Database nog niet klaar: '+(err.message||err));
+    return false;
+  }
+}
+
+async function submitDbConfig(ev){
+  ev.preventDefault();
+  if(!dbForm) return;
+  var payload = {
+    host: dbHost ? dbHost.value.trim() : 'localhost',
+    database: dbName ? dbName.value.trim() : 'vis_trips',
+    user: dbUser ? dbUser.value.trim() : '',
+    password: dbPass ? dbPass.value : ''
+  };
+  try{
+    var res = await fetch('/api/db/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var body = await res.json();
+    if(!res.ok || !body.ok){
+      throw new Error((body && body.error) ? body.error : ('HTTP '+res.status));
+    }
+    closeDbModal();
+    dbReady=true;
+    S('Database aangemaakt en gekoppeld.');
+    syncToServer(true);
+  }catch(err){
+    if(dbError) dbError.textContent = err.message || String(err);
+    S('Database instellen mislukt: '+(err.message||err));
+  }
+}
+
+if(dbForm){ dbForm.addEventListener('submit', submitDbConfig); }
+if(dbCancel){ dbCancel.addEventListener('click', function(){ closeDbModal(); }); }
 function saveDB(){
   try{localStorage.setItem(DB_KEY,JSON.stringify(db));}catch(e){}
   scheduleSync();
@@ -100,15 +170,24 @@ async function syncToServer(force){
   S('Wegschrijven naar MySQL...');
   try{
     var res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(db)});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    var body=await res.json();
+    var body=null;
+    try{ body=await res.json(); }catch(_){ }
+    if(!res.ok){
+      if(body && body.needsCredentials){ openDbModal(body.defaults||{}); return; }
+      throw new Error((body && body.error) ? body.error : ('HTTP '+res.status));
+    }
+    if(body && body.needsCredentials){ openDbModal(body.defaults||{}); return; }
     var s=body && body.summary ? body.summary : {};
     var parts=[];
     ['waters','steks','rigs','bathyPoints','bathyDatasets'].forEach(function(k){ if(s[k]!=null) parts.push(k+': '+s[k]); });
     S('MySQL opgeslagen'+(parts.length? ' ('+parts.join(', ')+')' : '.'));
   }catch(err){
     console.error('Sync fout',err);
-    S('MySQL fout: '+(err && err.message? err.message:err));
+    if(String(err).includes('503')){
+      checkDbStatus();
+      openDbModal();
+    }
+    S('MySQL fout of ontbrekende config: '+(err && err.message? err.message:err));
   }
 }
 function normalizeDB(){
@@ -438,6 +517,7 @@ function removeRig(id){ db.rigs=db.rigs.filter(function(r){return r.id!==id;}); 
 
 // init
 renderAll();
+checkDbStatus().then(function(ok){ if(ok && syncEnabled) scheduleSync(); });
 S('Klaar.');
 
 (function(global){

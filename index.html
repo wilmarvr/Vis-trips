@@ -135,6 +135,30 @@
   🎯 Nauwkeurigheid: <span id="gpsAcc">–</span> m | Snelheid: <span id="gpsSpd">–</span> m/s | Koers: <span id="gpsBrg">–</span>°
 </div>
 
+<div id="dbModal" aria-hidden="true">
+  <form id="dbForm" class="dialog">
+    <h3>MySQL instellen</h3>
+    <p>We konden nog geen database vinden. Vul hieronder de gegevens in en wij maken de database en tabellen voor je aan.</p>
+    <label>Host
+      <input id="dbHost" name="host" autocomplete="off" required>
+    </label>
+    <label>Database
+      <input id="dbName" name="database" autocomplete="off" required>
+    </label>
+    <label>Gebruiker
+      <input id="dbUser" name="user" autocomplete="off" required>
+    </label>
+    <label>Wachtwoord
+      <input id="dbPass" name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <div class="error" id="dbError"></div>
+    <div class="actions">
+      <button type="button" id="dbCancel" class="secondary">Later</button>
+      <button type="submit">Opslaan & aanmaken</button>
+    </div>
+  </form>
+</div>
+
 <!-- Deduplicate-fix om dubbele toolbars te verwijderen (laat eerste exemplaar staan) -->
 
 <!-- Leaflet & plugins (JS — volgorde is belangrijk) -->

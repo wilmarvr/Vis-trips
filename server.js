@@ -1,13 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 const express = require('express');
 const mysql = require('mysql2/promise');
 
 const app = express();
 app.use(express.json({limit:'20mb'}));
 
-function loadConfig(){
+function loadConfig({allowMissing=false}={}){
   const cfgPath = path.join(__dirname, 'mysql', 'config.json');
   if(fs.existsSync(cfgPath)){
     const fileCfg = JSON.parse(fs.readFileSync(cfgPath,'utf8'));
@@ -21,19 +20,17 @@ function loadConfig(){
   };
   const hasEnv = ['MYSQL_HOST','MYSQL_USER','MYSQL_PASSWORD','MYSQL_DATABASE'].some(key => process.env[key]);
   if(hasEnv) return envCfg;
+  if(allowMissing) return null;
   throw new Error('MySQL config ontbreekt. Maak mysql/config.json of stel MYSQL_* variabelen in.');
 }
 
-let pool;
-
-async function promptForDbUser(defaultUser){
-  const rl = readline.createInterface({input:process.stdin, output:process.stdout});
-  const ask = (question) => new Promise(resolve => rl.question(question, answer => resolve(answer)));
-  const user = (await ask(`Welke databasegebruiker moet worden aangemaakt of gebruikt? (${defaultUser}): `)) || defaultUser;
-  const password = await ask('Welk wachtwoord moet die gebruiker krijgen? ');
-  rl.close();
-  return {user, password};
+function writeConfigFile(cfg){
+  const cfgPath = path.join(__dirname, 'mysql', 'config.json');
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
 }
+
+let pool;
+let poolConfig = null;
 
 async function ensureDatabaseAndTables(config){
   const adminConfig = {...config};
@@ -50,14 +47,13 @@ async function ensureDatabaseAndTables(config){
 
   if(!dbExists){
     console.log(`Database ${config.database} bestaat niet. We maken hem aan.`);
-    const creds = await promptForDbUser(config.user || 'vistrips');
-    finalUser = creds.user;
-    finalPassword = creds.password;
-
+    if(!config.user || !config.password){
+      throw new Error('Gebruikersnaam/wachtwoord ontbreken voor het aanmaken van de database.');
+    }
     const dbName = mysql.escapeId(config.database);
+    const userIdent = mysql.escape(config.user);
     await connection.query(`CREATE DATABASE ${dbName} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-    const userIdent = mysql.escape(creds.user);
-    await connection.query(`CREATE USER IF NOT EXISTS ${userIdent}@'%' IDENTIFIED BY ${mysql.escape(creds.password)}`);
+    await connection.query(`CREATE USER IF NOT EXISTS ${userIdent}@'%' IDENTIFIED BY ${mysql.escape(config.password)}`);
     await connection.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userIdent}@'%'`);
     await connection.query('FLUSH PRIVILEGES');
   }
@@ -116,6 +112,14 @@ async function saveAll(payload){
 }
 
 app.post('/api/save', async (req,res)=>{
+  if(!pool){
+    const cfg = loadConfig({allowMissing:true});
+    const defaults = {
+      host: (cfg && cfg.host) || 'localhost',
+      database: (cfg && cfg.database) || 'vis_trips'
+    };
+    return res.status(503).json({ok:false,needsCredentials:true,defaults,error:'Database nog niet geconfigureerd. Vul de gegevens eerst in.'});
+  }
   try{
     const summary = await saveAll(req.body || {});
     res.json({ok:true, summary});
@@ -125,15 +129,82 @@ app.post('/api/save', async (req,res)=>{
   }
 });
 
-async function start(){
-  const config = loadConfig();
-  const ensuredConfig = await ensureDatabaseAndTables(config);
+function missingFields(cfg){
+  const missing = [];
+  if(!cfg || !cfg.host) missing.push('host');
+  if(!cfg || !cfg.database) missing.push('database');
+  if(!cfg || !cfg.user) missing.push('user');
+  if(!cfg || !cfg.password) missing.push('password');
+  return missing;
+}
+
+async function initPool(cfg){
+  if(pool){
+    try{ await pool.end(); }catch(_){ }
+  }
   pool = mysql.createPool({
-    ...ensuredConfig,
+    ...cfg,
     waitForConnections:true,
     connectionLimit:5,
     namedPlaceholders:true
   });
+  poolConfig = cfg;
+}
+
+app.get('/api/db/status', async (req,res)=>{
+  try{
+    const cfg = loadConfig({allowMissing:true});
+    const defaults = {
+      host: (cfg && cfg.host) || 'localhost',
+      database: (cfg && cfg.database) || 'vis_trips'
+    };
+    const missing = missingFields(cfg);
+    if(missing.length){
+      return res.json({ok:false, needsCredentials:true, missing, defaults});
+    }
+
+    if(!pool){
+      const ensured = await ensureDatabaseAndTables(cfg);
+      await initPool(ensured);
+    }
+
+    res.json({ok:true});
+  }catch(err){
+    console.error('DB status failed', err);
+    res.status(500).json({ok:false,error:err.message||String(err)});
+  }
+});
+
+app.post('/api/db/config', async (req,res)=>{
+  const {host='localhost', database='vis_trips', user, password} = req.body || {};
+  if(!user || !password){
+    return res.status(400).json({ok:false,error:'Gebruiker en wachtwoord zijn verplicht.'});
+  }
+  try{
+    const cfg = {host, database, user, password};
+    const ensured = await ensureDatabaseAndTables(cfg);
+    writeConfigFile(ensured);
+    await initPool(ensured);
+    res.json({ok:true});
+  }catch(err){
+    console.error('DB config failed', err);
+    res.status(500).json({ok:false,error:err.message||String(err)});
+  }
+});
+
+async function start(){
+  try{
+    const config = loadConfig({allowMissing:true});
+    if(config && !missingFields(config).length){
+      const ensuredConfig = await ensureDatabaseAndTables(config);
+      await initPool(ensuredConfig);
+      console.log('Database en tabellen zijn klaar.');
+    }else{
+      console.warn('Databaseconfig ontbreekt of is incompleet. Wacht op invoer via de UI.');
+    }
+  }catch(err){
+    console.warn('Kon de database niet initialiseren bij start:', err.message || err);
+  }
 
   const port = process.env.PORT || 3000;
   app.listen(port, ()=>{
@@ -142,6 +213,6 @@ async function start(){
 }
 
 start().catch(err => {
-  console.error('Kon de database niet initialiseren of de server niet starten:', err);
+  console.error('Kon de server niet starten:', err);
   process.exit(1);
 });
