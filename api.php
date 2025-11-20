@@ -83,7 +83,7 @@ function handle_config(): void
     $cfg = [
         'host' => trim($body['host'] ?? 'localhost'),
         'port' => (int)($body['port'] ?? 3306),
-        'database' => trim($body['database'] ?? DEFAULT_DB),
+        'database' => sanitize_database_name((string)($body['database'] ?? DEFAULT_DB)),
         'user' => trim($body['user'] ?? ''),
         'password' => (string)($body['password'] ?? ''),
     ];
@@ -150,10 +150,17 @@ function load_config(bool $allowMissing = false): ?array
         return null;
     }
 
+    $database = sanitize_database_name((string)($cfg['database'] ?? DEFAULT_DB));
+
+    if (($cfg['database'] ?? '') !== $database) {
+        $cfg['database'] = $database;
+        write_config($cfg);
+    }
+
     return [
         'host' => $cfg['host'] ?? 'localhost',
         'port' => (int)($cfg['port'] ?? 3306),
-        'database' => $cfg['database'] ?? DEFAULT_DB,
+        'database' => $database,
         'user' => $cfg['user'] ?? null,
         'password' => $cfg['password'] ?? null,
     ];
@@ -191,9 +198,22 @@ function default_payloads(?array $cfg): array
     return [
         'host' => $cfg['host'] ?? 'localhost',
         'port' => $cfg['port'] ?? 3306,
-        'database' => $cfg['database'] ?? DEFAULT_DB,
+        'database' => sanitize_database_name((string)($cfg['database'] ?? DEFAULT_DB)),
         'user' => $cfg['user'] ?? null,
     ];
+}
+
+function sanitize_database_name(string $name): string
+{
+    $trimmed = trim($name);
+    // strip charset or other DSN fragments after a semicolon or whitespace
+    $trimmed = preg_split('/[;\s]/', $trimmed)[0] ?? '';
+    $trimmed = str_replace('`', '', $trimmed);
+    $trimmed = preg_replace('/[^A-Za-z0-9_]/', '', $trimmed ?? '');
+    if ($trimmed === '') {
+        return DEFAULT_DB;
+    }
+    return $trimmed;
 }
 
 function attempt_auto_provision(array $defaults): array
@@ -287,8 +307,9 @@ function make_pdo(array $cfg, bool $withDatabase = true): PDO
 
 function ensure_database_and_tables(array $cfg, ?array $admin = null): PDO
 {
-    $dbName = $cfg['database'] ?? DEFAULT_DB;
+    $dbName = sanitize_database_name((string)($cfg['database'] ?? DEFAULT_DB));
 
+    $cfg['database'] = $dbName;
     $provisionCfg = $cfg;
     $hasAdmin = $admin && ($admin['user'] ?? '') !== '';
     if ($hasAdmin) {
