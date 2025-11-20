@@ -111,7 +111,7 @@ function closeDbModal(){
 
 async function checkDbStatus(){
   try{
-    var res = await fetch('/api/db/status');
+    var res = await fetch('api.php?action=status');
     if(!res.ok) throw new Error('HTTP '+res.status);
     var body = await res.json();
     if(body && body.ok){ dbReady=true; return true; }
@@ -138,7 +138,7 @@ async function submitDbConfig(ev){
     password: dbPass ? dbPass.value : ''
   };
   try{
-    var res = await fetch('/api/db/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var res = await fetch('api.php?action=config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var body = await res.json();
     if(!res.ok || !body.ok){
       throw new Error((body && body.error) ? body.error : ('HTTP '+res.status));
@@ -169,7 +169,7 @@ async function syncToServer(force){
   if(syncTimer){ clearTimeout(syncTimer); syncTimer=null; }
   S('Wegschrijven naar MySQL...');
   try{
-    var res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(db)});
+    var res=await fetch('api.php?action=save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(db)});
     var body=null;
     try{ body=await res.json(); }catch(_){ }
     if(!res.ok){

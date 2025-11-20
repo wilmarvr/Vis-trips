@@ -5,6 +5,7 @@ const mysql = require('mysql2/promise');
 
 const app = express();
 app.use(express.json({limit:'20mb'}));
+app.use(express.static(path.join(__dirname)));
 
 function loadConfig({allowMissing=false}={}){
   const cfgPath = path.join(__dirname, 'mysql', 'config.json');
@@ -113,12 +114,25 @@ async function saveAll(payload){
 
 app.post('/api/save', async (req,res)=>{
   if(!pool){
-    const cfg = loadConfig({allowMissing:true});
-    const defaults = {
-      host: (cfg && cfg.host) || 'localhost',
-      database: (cfg && cfg.database) || 'vis_trips'
-    };
-    return res.status(503).json({ok:false,needsCredentials:true,defaults,error:'Database nog niet geconfigureerd. Vul de gegevens eerst in.'});
+    try{
+      const cfg = loadConfig({allowMissing:true});
+      const defaults = {
+        host: (cfg && cfg.host) || 'localhost',
+        database: (cfg && cfg.database) || 'vis_trips',
+        user: cfg && cfg.user,
+      };
+      const missing = missingFields(cfg);
+      if(missing.length){
+        return res.status(503).json({ok:false,needsCredentials:true,defaults,missing,error:'Database nog niet geconfigureerd. Vul de gegevens eerst in.'});
+      }
+      const ensured = await ensureDatabaseAndTables(cfg);
+      await initPool(ensured);
+    }catch(err){
+      const cfg = loadConfig({allowMissing:true}) || {};
+      const defaults = {host: cfg.host || 'localhost', database: cfg.database || 'vis_trips', user: cfg.user};
+      console.error('Pool ontbreekt en initialisatie faalde', err);
+      return res.status(503).json({ok:false,needsCredentials:true,defaults,error:err.message||String(err)});
+    }
   }
   try{
     const summary = await saveAll(req.body || {});
@@ -173,6 +187,10 @@ app.get('/api/db/status', async (req,res)=>{
     console.error('DB status failed', err);
     res.status(500).json({ok:false,error:err.message||String(err)});
   }
+});
+
+app.get('/', (req,res)=>{
+  res.sendFile(path.join(__dirname,'index.html'));
 });
 
 app.post('/api/db/config', async (req,res)=>{
