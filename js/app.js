@@ -123,6 +123,7 @@ async function checkDbStatus(){
     throw new Error(body && body.error ? body.error : 'Database status onbekend');
   }catch(err){
     console.warn('DB status fout', err);
+    openDbModal();
     S('Database nog niet klaar: '+(err.message||err));
     return false;
   }
