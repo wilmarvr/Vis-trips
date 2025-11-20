@@ -56,6 +56,10 @@ function handle_status(): void
     $missing = missing_fields($cfg);
 
     if ($missing) {
+        $auto = attempt_auto_provision($defaults);
+        if ($auto['ok']) {
+            json_response(['ok' => true, 'autoProvisioned' => true]);
+        }
         json_response(['ok' => false, 'needsCredentials' => true, 'missing' => $missing, 'defaults' => $defaults]);
     }
 
@@ -181,9 +185,61 @@ function default_payloads(?array $cfg): array
 {
     return [
         'host' => $cfg['host'] ?? 'localhost',
+        'port' => $cfg['port'] ?? 3306,
         'database' => $cfg['database'] ?? DEFAULT_DB,
         'user' => $cfg['user'] ?? null,
     ];
+}
+
+function attempt_auto_provision(array $defaults): array
+{
+    $host = $defaults['host'] ?? 'localhost';
+    $port = (int)($defaults['port'] ?? 3306);
+    $dbName = $defaults['database'] ?? DEFAULT_DB;
+
+    $adminCfg = [
+        'host' => $host,
+        'port' => $port,
+        'database' => $dbName,
+        'user' => 'root',
+        'password' => '',
+    ];
+
+    try {
+        $pdo = make_pdo($adminCfg, false);
+    } catch (Throwable $e) {
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
+
+    try {
+        $pdo->exec(sprintf(
+            'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+            str_replace('`', '``', $dbName)
+        ));
+
+        $appUser = 'vis_app';
+        $appPass = bin2hex(random_bytes(6));
+
+        $pdo->exec(sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", str_replace('`', '``', $appUser), addslashes($appPass)));
+        $pdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", str_replace('`', '``', $dbName), str_replace('`', '``', $appUser)));
+        $pdo->exec('FLUSH PRIVILEGES');
+
+        $appCfg = [
+            'host' => $host,
+            'port' => $port,
+            'database' => $dbName,
+            'user' => $appUser,
+            'password' => $appPass,
+        ];
+
+        $appPdo = make_pdo($appCfg, true);
+        ensure_schema($appPdo);
+        write_config($appCfg);
+
+        return ['ok' => true, 'config' => $appCfg];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
 }
 
 function read_json(): array

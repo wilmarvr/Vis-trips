@@ -114,7 +114,11 @@ async function checkDbStatus(){
     var res = await fetch('api.php?action=status');
     if(!res.ok) throw new Error('HTTP '+res.status);
     var body = await res.json();
-    if(body && body.ok){ dbReady=true; return true; }
+    if(body && body.ok){
+      dbReady=true;
+      if(body.autoProvisioned){ S('Database automatisch aangemaakt met standaardwaarden.'); }
+      return true;
+    }
     if(body && body.needsCredentials){
       openDbModal(body.defaults||{});
       dbReady=false;
