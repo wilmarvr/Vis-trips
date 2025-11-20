@@ -1,0 +1,6 @@
+{
+  "host": "localhost",
+  "user": "vis_user",
+  "password": "geheim",
+  "database": "vis_trips"
+}
