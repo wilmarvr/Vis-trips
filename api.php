@@ -269,12 +269,18 @@ function make_pdo(array $cfg, bool $withDatabase = true): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
     ];
 
-    $dsn = sprintf(
-        'mysql:host=%s;port=%s;%s;charset=utf8mb4',
-        $cfg['host'] ?? 'localhost',
-        $cfg['port'] ?? 3306,
-        $withDatabase ? ('dbname=' . ($cfg['database'] ?? DEFAULT_DB) . ';') : ''
-    );
+    $parts = [
+        'host=' . ($cfg['host'] ?? 'localhost'),
+        'port=' . ($cfg['port'] ?? 3306),
+    ];
+
+    if ($withDatabase) {
+        $parts[] = 'dbname=' . ($cfg['database'] ?? DEFAULT_DB);
+    }
+
+    $parts[] = 'charset=utf8mb4';
+
+    $dsn = 'mysql:' . implode(';', $parts);
 
     return new PDO($dsn, (string)$cfg['user'], (string)$cfg['password'], $options);
 }
