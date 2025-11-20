@@ -88,12 +88,17 @@ function handle_config(): void
         'password' => (string)($body['password'] ?? ''),
     ];
 
+    $admin = [
+        'user' => trim($body['adminUser'] ?? ''),
+        'password' => (string)($body['adminPassword'] ?? ''),
+    ];
+
     if ($cfg['user'] === '' || $cfg['password'] === '') {
         json_response(['ok' => false, 'error' => 'Gebruiker en wachtwoord zijn verplicht.'], 400);
     }
 
     try {
-        $pdo = ensure_database_and_tables($cfg);
+        $pdo = ensure_database_and_tables($cfg, $admin);
         write_config($cfg);
         $pdo = null;
         json_response(['ok' => true]);
@@ -274,10 +279,25 @@ function make_pdo(array $cfg, bool $withDatabase = true): PDO
     return new PDO($dsn, (string)$cfg['user'], (string)$cfg['password'], $options);
 }
 
-function ensure_database_and_tables(array $cfg): PDO
+function ensure_database_and_tables(array $cfg, ?array $admin = null): PDO
 {
-    $basePdo = make_pdo($cfg, false);
     $dbName = $cfg['database'] ?? DEFAULT_DB;
+
+    $provisionCfg = $cfg;
+    $hasAdmin = $admin && ($admin['user'] ?? '') !== '';
+    if ($hasAdmin) {
+        $provisionCfg['user'] = (string)$admin['user'];
+        $provisionCfg['password'] = (string)($admin['password'] ?? '');
+    }
+
+    try {
+        $basePdo = make_pdo($provisionCfg, false);
+    } catch (Throwable $e) {
+        $message = $hasAdmin
+            ? 'Admin-verbinding mislukt: ' . $e->getMessage()
+            : 'Verbinden met MySQL mislukt. Geef een admin-account om de database te kunnen aanmaken.';
+        throw new RuntimeException($message, 0, $e);
+    }
 
     // Maak database en gebruiker indien nodig
     $basePdo->exec(sprintf(
@@ -293,7 +313,11 @@ function ensure_database_and_tables(array $cfg): PDO
         $basePdo->exec('FLUSH PRIVILEGES');
     }
 
-    $pdo = make_pdo($cfg, true);
+    try {
+        $pdo = make_pdo($cfg, true);
+    } catch (Throwable $e) {
+        throw new RuntimeException('Verbinden met de applicatiegebruiker mislukt: ' . $e->getMessage(), 0, $e);
+    }
     ensure_schema($pdo);
     return $pdo;
 }

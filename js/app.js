@@ -94,6 +94,8 @@ var dbHost=document.getElementById('dbHost');
 var dbName=document.getElementById('dbName');
 var dbUser=document.getElementById('dbUser');
 var dbPass=document.getElementById('dbPass');
+var dbAdminUser=document.getElementById('dbAdminUser');
+var dbAdminPass=document.getElementById('dbAdminPass');
 var dbCancel=document.getElementById('dbCancel');
 
 function openDbModal(defaults){
@@ -101,6 +103,8 @@ function openDbModal(defaults){
   if(dbName) dbName.value = defaults && defaults.database ? defaults.database : 'vis_trips';
   if(dbUser) dbUser.value = defaults && defaults.user ? defaults.user : '';
   if(dbPass) dbPass.value = '';
+  if(dbAdminUser) dbAdminUser.value = '';
+  if(dbAdminPass) dbAdminPass.value = '';
   if(dbError) dbError.textContent='';
   if(dbModal){ dbModal.classList.add('open'); dbModal.setAttribute('aria-hidden','false'); }
 }
@@ -140,7 +144,9 @@ async function submitDbConfig(ev){
     host: dbHost ? dbHost.value.trim() : 'localhost',
     database: dbName ? dbName.value.trim() : 'vis_trips',
     user: dbUser ? dbUser.value.trim() : '',
-    password: dbPass ? dbPass.value : ''
+    password: dbPass ? dbPass.value : '',
+    adminUser: dbAdminUser ? dbAdminUser.value.trim() : '',
+    adminPassword: dbAdminPass ? dbAdminPass.value : ''
   };
   try{
     var res = await fetch('api.php?action=config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});

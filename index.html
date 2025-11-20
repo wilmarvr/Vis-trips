@@ -151,6 +151,14 @@
     <label>Wachtwoord
       <input id="dbPass" name="password" type="password" autocomplete="current-password" required>
     </label>
+    <p class="hint">We gebruiken een beheerdersaccount om de database en applicatiegebruiker aan te maken. Vul die hieronder in (wordt niet opgeslagen).
+    </p>
+    <label>Admin gebruiker
+      <input id="dbAdminUser" name="adminUser" autocomplete="off" placeholder="bijv. root">
+    </label>
+    <label>Admin wachtwoord
+      <input id="dbAdminPass" name="adminPassword" type="password" autocomplete="current-password">
+    </label>
     <div class="error" id="dbError"></div>
     <div class="actions">
       <button type="button" id="dbCancel" class="secondary">Later</button>

@@ -213,6 +213,12 @@ th {
   margin: 0 0 8px;
 }
 
+#dbModal .hint {
+  font-size: 13px;
+  color: #a9b8c6;
+  margin: 6px 0 2px;
+}
+
 #dbModal label {
   display: block;
   margin: 6px 0;
