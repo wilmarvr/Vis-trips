@@ -310,41 +310,40 @@ function ensure_database_and_tables(array $cfg, ?array $admin = null): PDO
     $dbName = sanitize_database_name((string)($cfg['database'] ?? DEFAULT_DB));
 
     $cfg['database'] = $dbName;
+    $provisionCfg = $cfg;
     $hasAdmin = $admin && ($admin['user'] ?? '') !== '';
     if ($hasAdmin) {
-        $provisionCfg = $cfg;
         $provisionCfg['user'] = (string)$admin['user'];
         $provisionCfg['password'] = (string)($admin['password'] ?? '');
+    }
 
-        try {
-            $basePdo = make_pdo($provisionCfg, false);
-        } catch (Throwable $e) {
-            throw new RuntimeException('Admin-verbinding mislukt: ' . $e->getMessage(), 0, $e);
-        }
+    try {
+        $basePdo = make_pdo($provisionCfg, false);
+    } catch (Throwable $e) {
+        $message = $hasAdmin
+            ? 'Admin-verbinding mislukt: ' . $e->getMessage()
+            : 'Verbinden met MySQL mislukt. Geef een admin-account om de database te kunnen aanmaken.';
+        throw new RuntimeException($message, 0, $e);
+    }
 
-        // Maak database en gebruiker indien nodig
-        $basePdo->exec(sprintf(
-            'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
-            str_replace('`', '``', $dbName)
-        ));
+    // Maak database en gebruiker indien nodig
+    $basePdo->exec(sprintf(
+        'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+        str_replace('`', '``', $dbName)
+    ));
 
-        if (($cfg['user'] ?? '') !== '') {
-            $user = str_replace('`', '``', (string)$cfg['user']);
-            $password = addslashes((string)$cfg['password']);
-            $basePdo->exec(sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", $user, $password));
-            $basePdo->exec(sprintf("ALTER USER '%s'@'%%' IDENTIFIED BY '%s'", $user, $password));
-            $basePdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", str_replace('`', '``', $dbName), $user));
-            $basePdo->exec('FLUSH PRIVILEGES');
-        }
+    if (($cfg['user'] ?? '') !== '') {
+        $user = str_replace('`', '``', (string)$cfg['user']);
+        $password = addslashes((string)$cfg['password']);
+        $basePdo->exec(sprintf("CREATE USER IF NOT EXISTS '%s'@'%%' IDENTIFIED BY '%s'", $user, $password));
+        $basePdo->exec(sprintf("GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%'", str_replace('`', '``', $dbName), $user));
+        $basePdo->exec('FLUSH PRIVILEGES');
     }
 
     try {
         $pdo = make_pdo($cfg, true);
     } catch (Throwable $e) {
-        $message = $hasAdmin
-            ? 'Verbinden met de applicatiegebruiker mislukt: ' . $e->getMessage()
-            : 'Verbinden met de applicatiegebruiker mislukt. Geef een admin-account om de database te kunnen aanmaken: ' . $e->getMessage();
-        throw new RuntimeException($message, 0, $e);
+        throw new RuntimeException('Verbinden met de applicatiegebruiker mislukt: ' . $e->getMessage(), 0, $e);
     }
     ensure_schema($pdo);
     return $pdo;
@@ -516,3 +515,4 @@ function json_response(array $data, int $status = 200): void
     echo json_encode($data);
     exit;
 }
+
