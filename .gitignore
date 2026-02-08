@@ -1,2 +1,5 @@
-node_modules/
-mysql/config.json
+node_modules
+.env
+npm-debug.log*
+.DS_Store
+public/config.php

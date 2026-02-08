@@ -1,0 +1,143 @@
+:root {
+  --blue: #1e3a8a;
+  --light-blue: #e0f2fe;
+  --accent: #0ea5e9;
+  --text: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0f172a, #0ea5e9);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.app {
+  width: 100%;
+  max-width: 960px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+
+header {
+  background: radial-gradient(circle at 20% 20%, #0ea5e9, #1e3a8a 70%);
+  color: white;
+  padding: 32px;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+}
+
+header p {
+  margin: 0;
+  max-width: 720px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+main {
+  padding: 24px 32px 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+form {
+  background: var(--light-blue);
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+input,
+textarea,
+button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-size: 15px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+button {
+  background: var(--blue);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover {
+  background: #0b2c75;
+}
+
+.status {
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+}
+
+.trips {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+}
+
+.card h3 {
+  margin: 0 0 6px;
+  color: var(--blue);
+}
+
+.card .meta {
+  color: #475569;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.empty {
+  color: #475569;
+  text-align: center;
+  padding: 24px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+}
+
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
